@@ -44,6 +44,8 @@ function initializeSocket(server) {
           content: newMessage.content,
           timestamp: newMessage.timestamp,
           status: "sent",
+          senderFirstName: sender.firstName,
+          senderLastName: sender.lastName,
         });
 
         // Notification logic
