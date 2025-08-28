@@ -1,5 +1,6 @@
 const { Server } = require("socket.io");
 const Chat = require("../model/chatModel");
+const User = require('../model/userModel');
 const { createNotification } = require("../controller/notificationController");
 
 function initializeSocket(server) {
@@ -36,6 +37,13 @@ function initializeSocket(server) {
 
         chat.messages.push(newMessage);
         await chat.save();
+
+        // ✅ Fetch sender info
+        const sender = await User.findById(senderId); // make sure you have User model imported
+        if (!sender) {
+          console.error("Sender not found");
+          return;
+        }
 
         // Emit to recipient room
         io.to(recipientId).emit("receiveMessage", {
