@@ -54,6 +54,7 @@ function initializeSocket(server) {
           status: "sent",
           senderFirstName: sender.firstName,
           senderLastName: sender.lastName,
+          senderProfileImage: sender.profileImage,
         });
 
         // Notification logic
@@ -68,6 +69,7 @@ function initializeSocket(server) {
           senderId,
           senderFirstName: sender.firstName,
           senderLastName: sender.lastName,
+          senderProfileImage: sender.profileImage,
           chatId,
           message: newMessage.content,
           timestamp: newMessage.timestamp,
