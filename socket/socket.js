@@ -43,19 +43,21 @@ function initializeSocket(server) {
           senderId: newMessage.sender,
           content: newMessage.content,
           timestamp: newMessage.timestamp,
-          status: "sent", 
+          status: "sent",
         });
 
         // Notification logic
         await createNotification(
           recipientId,
           "chat",
-          `New message from user ${senderId}`
+          `New message from ${sender.firstName} ${sender.lastName}`
         );
 
         io.to(recipientId).emit("new_notification", {
           type: "chat",
           senderId,
+          senderFirstName: sender.firstName,
+          senderLastName: sender.lastName,
           chatId,
           message: newMessage.content,
           timestamp: newMessage.timestamp,
