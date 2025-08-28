@@ -40,8 +40,10 @@ function initializeSocket(server) {
         // Emit to recipient room
         io.to(recipientId).emit("receiveMessage", {
           chatId,
-          senderId,
-          message: newMessage,
+          senderId: newMessage.sender,
+          content: newMessage.content,
+          timestamp: newMessage.timestamp,
+          status: "sent", 
         });
 
         // Notification logic
@@ -58,7 +60,6 @@ function initializeSocket(server) {
           message: newMessage.content,
           timestamp: newMessage.timestamp,
         });
-
       } catch (error) {
         console.error("Error saving message:", error);
       }
