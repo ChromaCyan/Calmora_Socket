@@ -1,6 +1,6 @@
 const { Server } = require("socket.io");
 const Chat = require("../model/chatModel");
-const User = require('../model/userModel');
+const User = require("../model/userModel");
 const { createNotification } = require("../controller/notificationController");
 
 function initializeSocket(server) {
@@ -13,6 +13,11 @@ function initializeSocket(server) {
 
   io.on("connection", (socket) => {
     console.log(`User connected: ${socket.id}`);
+
+    socket.on("registerUser", (userId) => {
+      socket.join(userId);
+      console.log(`User ${userId} registered for notifications`);
+    });
 
     socket.on("sendMessage", async (data) => {
       console.log("Message received: ", data);
@@ -77,6 +82,11 @@ function initializeSocket(server) {
       } catch (error) {
         console.error("Error saving message:", error);
       }
+    });
+
+    socket.on("registerUser", (userId) => {
+      socket.join(userId);
+      console.log(`User ${userId} registered for notifications`);
     });
 
     socket.on("joinRoom", (roomId) => {
