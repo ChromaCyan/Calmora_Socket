@@ -24,6 +24,7 @@ mongoose.connect(process.env.MONGO_URI, {
   .catch((err) => console.error("MongoDB connection error:", err));
 
 app.post("/emit-notification", async (req, res) => {
+  console.log("📥 Received emit-notification request:", req.body);
   try {
     const { userId, type, message, extra = {} } = req.body;
 
