@@ -69,16 +69,27 @@ Do not go out of topic outside of mental health, always keep them in topic about
         }),
       });
 
-      const buffer = Buffer.from(await audioResp.arrayBuffer());
-      const base64Audio = buffer.toString("base64");
+      if (!audioResp.ok) {
+        const errorBody = await audioResp.text();
+        console.error("ElevenLabs error:", errorBody);
+        return res
+          .status(500)
+          .json({ error: "TTS request failed", detail: errorBody });
+      }
 
-      return res.json({ reply, audioBase64: base64Audio });
+      const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
+
+      res.set({
+        "Content-Type": "audio/mpeg",
+        "Content-Disposition": "inline; filename=calmora-voice.mp3",
+      });
+
+      return res.end(audioBuffer);
     }
 
-    // Respond immediately with text + optional TTS ID
-    res.json({ reply, ttsPending: !!withVoice, id });
+    res.json({ reply });
   } catch (err) {
-    console.error("Gemini Error:", err.message);
+    console.error("Gemini Error:", err);
     res.status(500).json({ error: "AI Error: Unable to respond right now." });
   }
 };
