@@ -6,6 +6,7 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const initializeSocket = require("./socket/socket");
 const Notification = require("./model/notificationModel"); 
+const geminiRoutes = require("./routes/geminiRoute");
 
 const app = express();
 app.use(cors());
@@ -15,6 +16,8 @@ app.use(express.json());
 const server = http.createServer(app);
 
 const io = initializeSocket(server); 
+
+app.use("/api/chatbot", geminiRoutes);
 
 // Connect MongoDB
 mongoose.connect(process.env.MONGO_URI, {
