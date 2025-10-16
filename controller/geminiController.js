@@ -29,11 +29,16 @@ exports.askGemini = async (req, res) => {
     if (chatId) {
       chat = await GeminiChat.findById(chatId);
     } else {
-      chat = new GeminiChat({
-        user: userId,
-        messages: [],
-      });
-      await chat.save();
+      chat = await GeminiChat.findOne({ user: userId });
+      if (!chat) {
+        chat = new GeminiChat({
+          user: userId,
+          participants: [userId],
+          isCalmoraChat: true,
+          messages: [],
+        });
+        await chat.save();
+      }
     }
 
     const recentMessages = chat.messages.slice(-3).map((msg) => ({
