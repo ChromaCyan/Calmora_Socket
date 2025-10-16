@@ -13,7 +13,6 @@ const ELEVEN_API_KEY = "sk_f0d2df505095cd0f357b6e6e2fd51b41dd7f424ca9c73aba";
 
 const ttsCache = {};
 
-
 exports.askGemini = async (req, res) => {
   const { message, withVoice } = req.body;
 
@@ -34,7 +33,9 @@ You are not a licensed therapist. Be empathetic, kind, and suggest general menta
 You can diagnose, give treatment advice but be sure to inform the user that it's still better to seek professional help through our app Calmora.
 Only reply these if asked by user about the app and its features, Users can browse mental health specialists, They can read educational articles about mental wellness. Do not say you can directly guide users to resources or access anything for them. Otherwise don't bring any of these up when not asked.
 Respond in a friendly, clear tone, and respect user privacy.
-Do not go out of topic outside of mental health, always keep them in topic about their mental wellbeing and what they feel. Limit your response to ${withVoice ? 'max 250 characters' : 'any length'}. Respond in a friendly, clear tone and stay on topic about mental wellbeing.`,
+Do not go out of topic outside of mental health, always keep them in topic about their mental wellbeing and what they feel. Limit your response to ${
+            withVoice ? "max 250 characters" : "any length"
+          }. Respond in a friendly, clear tone and stay on topic about mental wellbeing.`,
         },
       ],
     };
@@ -50,40 +51,32 @@ Do not go out of topic outside of mental health, always keep them in topic about
 
     const reply = result.response.text();
 
-     let id = null;
+    let id = null;
 
     if (withVoice) {
-      id = uuidv4();
+      const voiceId = "LcfcDJNUP1GQjkzn1xUU";
+      const elevenUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
 
-    (async () => {
-        try {
-          const voiceId = "LcfcDJNUP1GQjkzn1xUU";
-          const elevenUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
-          const audioResp = await fetch(elevenUrl, {
-            method: "POST",
-            headers: {
-              "xi-api-key": ELEVEN_API_KEY,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              text: reply,
-              voice_settings: { stability: 0.5, similarity_boost: 0.7 },
-            }),
-          });
+      const audioResp = await fetch(elevenUrl, {
+        method: "POST",
+        headers: {
+          "xi-api-key": ELEVEN_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: reply,
+          voice_settings: { stability: 0.5, similarity_boost: 0.7 },
+        }),
+      });
 
-          const buffer = Buffer.from(await audioResp.arrayBuffer());
-          ttsCache[id] = buffer.toString("base64");
+      const buffer = Buffer.from(await audioResp.arrayBuffer());
+      const base64Audio = buffer.toString("base64");
 
-          setTimeout(() => delete ttsCache[id], 5 * 60 * 1000);
-        } catch (err) {
-          console.error("Async TTS Error:", err);
-        }
-      })();
+      return res.json({ reply, audioBase64: base64Audio });
     }
 
     // Respond immediately with text + optional TTS ID
     res.json({ reply, ttsPending: !!withVoice, id });
-
   } catch (err) {
     console.error("Gemini Error:", err.message);
     res.status(500).json({ error: "AI Error: Unable to respond right now." });
@@ -92,7 +85,8 @@ Do not go out of topic outside of mental health, always keep them in topic about
 
 exports.fetchAudio = (req, res) => {
   const { id } = req.query;
-  if (!id || !ttsCache[id]) return res.status(404).json({ error: "Audio not ready" });
+  if (!id || !ttsCache[id])
+    return res.status(404).json({ error: "Audio not ready" });
 
   res.json({ audioBase64: ttsCache[id] });
 };
