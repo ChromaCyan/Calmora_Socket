@@ -6,4 +6,6 @@ router.post('/ask-ai', geminiController.askGemini);
 
 router.get('/fetch-audio', geminiController.fetchAudio);
 
+router.get("/chat-history/:userId", geminiController.getChatHistory);
+
 module.exports = router;

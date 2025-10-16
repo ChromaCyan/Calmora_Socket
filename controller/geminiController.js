@@ -1,6 +1,6 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { v4: uuidv4 } = require("uuid");
-
+const GeminiChat = require('../model/geminiModel'); 
 // This fucking part is broken so ill prolly temporarily
 // leave the API Key here while i look for fix since it can't read the .env file for some reason on this controller alone.
 
@@ -9,20 +9,37 @@ const { v4: uuidv4 } = require("uuid");
 //const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const genAI = new GoogleGenerativeAI("AIzaSyCIXMpsEUZBeIuuB_Pl2dDJozJlHzuk7nk");
-const ELEVEN_API_KEY = "sk_1d44771bb4bf8dce1f25491219b1614d5c7930152fa52d89";
+//const ELEVEN_API_KEY = "sk_f0d2df505095cd0f357b6e6e2fd51b41dd7f424ca9c73aba"; // Old Key
+const ELEVEN_API_KEY = "sk_a3a8f784947a8fada59fb54ed3585a438393985c48a91f5f";
 
 const ttsCache = {};
 
+
 exports.askGemini = async (req, res) => {
-  const { message, withVoice } = req.body;
+  const { message, withVoice, chatId, userId } = req.body;
 
   if (!message) {
     return res.status(400).json({ error: "Message is required" });
   }
 
   try {
-    // --- Gemini ---
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    let chat;
+    if (chatId) {
+      chat = await GeminiChat.findById(chatId);
+    } else {
+      chat = new GeminiChat({
+        user: userId,
+        messages: [],
+      });
+      await chat.save();
+    }
+
+    const recentMessages = chat.messages.slice(-3).map((msg) => ({
+      role: msg.sender === "user" ? "user" : "model",
+      parts: [{ text: msg.content }],
+    }));
 
     const systemPrompt = {
       role: "user",
@@ -40,64 +57,82 @@ Do not go out of topic outside of mental health, always keep them in topic about
       ],
     };
 
-    const userPrompt = {
-      role: "user",
-      parts: [{ text: message }],
-    };
+    const userPrompt = { role: "user", parts: [{ text: message }] };
 
     const result = await model.generateContent({
-      contents: [systemPrompt, userPrompt],
+      contents: [systemPrompt, ...recentMessages, userPrompt],
     });
 
     const reply = result.response.text();
 
+    chat.messages.push({ sender: "user", content: message });
+    chat.messages.push({ sender: "ai", content: reply });
+    await chat.save();
+
     let id = null;
-
     if (withVoice) {
-      const voiceId = "LcfcDJNUP1GQjkzn1xUU";
-      const elevenUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+      id = uuidv4();
+      (async () => {
+        try {
+          const voiceId = "LcfcDJNUP1GQjkzn1xUU";
+          const elevenUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+          const audioResp = await fetch(elevenUrl, {
+            method: "POST",
+            headers: {
+              "xi-api-key": ELEVEN_API_KEY,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text: reply,
+              voice_settings: { stability: 0.5, similarity_boost: 0.7 },
+            }),
+          });
 
-      const audioResp = await fetch(elevenUrl, {
-        method: "POST",
-        headers: {
-          "xi-api-key": ELEVEN_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: reply,
-          voice_settings: { stability: 0.5, similarity_boost: 0.7 },
-        }),
-      });
-
-      if (!audioResp.ok) {
-        const errorBody = await audioResp.text();
-        console.error("ElevenLabs error:", errorBody);
-        return res
-          .status(500)
-          .json({ error: "TTS request failed", detail: errorBody });
-      }
-
-      const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
-
-      res.set({
-        "Content-Type": "audio/mpeg",
-        "Content-Disposition": "inline; filename=calmora-voice.mp3",
-      });
-
-      return res.end(audioBuffer);
+          const buffer = Buffer.from(await audioResp.arrayBuffer());
+          ttsCache[id] = buffer.toString("base64");
+          setTimeout(() => delete ttsCache[id], 5 * 60 * 1000);
+        } catch (err) {
+          console.error("Async TTS Error:", err);
+        }
+      })();
     }
 
-    res.json({ reply });
+    res.json({
+      reply,
+      chatId: chat._id,
+      ttsPending: !!withVoice,
+      id,
+    });
   } catch (err) {
-    console.error("Gemini Error:", err);
+    console.error("Gemini Error:", err.message);
     res.status(500).json({ error: "AI Error: Unable to respond right now." });
   }
-};
+}
 
 exports.fetchAudio = (req, res) => {
   const { id } = req.query;
-  if (!id || !ttsCache[id])
-    return res.status(404).json({ error: "Audio not ready" });
+  if (!id || !ttsCache[id]) return res.status(404).json({ error: "Audio not ready" });
 
   res.json({ audioBase64: ttsCache[id] });
+};
+
+exports.getChatHistory = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    // Find the most recent chat for this user (or you can fetch all if you want)
+    const chat = await GeminiChat.findOne({ user: userId }).sort({ createdAt: -1 });
+
+    if (!chat) {
+      return res.status(404).json({ message: "No chat history found" });
+    }
+
+    res.json({
+      chatId: chat._id,
+      messages: chat.messages, // array of { sender, content, timestamp }
+    });
+  } catch (err) {
+    console.error("Error fetching chat history:", err);
+    res.status(500).json({ error: "Failed to load chat history" });
+  }
 };
