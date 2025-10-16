@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require("uuid");
 //const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const genAI = new GoogleGenerativeAI("AIzaSyCIXMpsEUZBeIuuB_Pl2dDJozJlHzuk7nk");
-const ELEVEN_API_KEY = "sk_f0d2df505095cd0f357b6e6e2fd51b41dd7f424ca9c73aba";
+const ELEVEN_API_KEY = "sk_1d44771bb4bf8dce1f25491219b1614d5c7930152fa52d89";
 
 const ttsCache = {};
 
