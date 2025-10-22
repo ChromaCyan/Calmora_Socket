@@ -1,5 +1,4 @@
 const TimeSlot = require("../model/timeslotModel");
-const { createNotification } = require("./notificationController");
 const Appointment = require("../model/appointmentModel");
 const User = require("../model/userModel");
 const axios = require("axios");
