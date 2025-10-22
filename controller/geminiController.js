@@ -1,6 +1,6 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { v4: uuidv4 } = require("uuid");
-const GeminiChat = require('../model/geminiModel'); 
+const GeminiChat = require("../model/geminiModel");
 // This fucking part is broken so ill prolly temporarily
 // leave the API Key here while i look for fix since it can't read the .env file for some reason on this controller alone.
 
@@ -13,7 +13,6 @@ const genAI = new GoogleGenerativeAI("AIzaSyCIXMpsEUZBeIuuB_Pl2dDJozJlHzuk7nk");
 const ELEVEN_API_KEY = "sk_a3a8f784947a8fada59fb54ed3585a438393985c48a91f5f";
 
 const ttsCache = {};
-
 
 exports.askGemini = async (req, res) => {
   const { message, withVoice, chatId, userId } = req.body;
@@ -112,11 +111,12 @@ Do not go out of topic outside of mental health, always keep them in topic about
     console.error("Gemini Error:", err.message);
     res.status(500).json({ error: "AI Error: Unable to respond right now." });
   }
-}
+};
 
 exports.fetchAudio = (req, res) => {
   const { id } = req.query;
-  if (!id || !ttsCache[id]) return res.status(404).json({ error: "Audio not ready" });
+  if (!id || !ttsCache[id])
+    return res.status(404).json({ error: "Audio not ready" });
 
   res.json({ audioBase64: ttsCache[id] });
 };
@@ -126,7 +126,9 @@ exports.getChatHistory = async (req, res) => {
 
   try {
     // Find the most recent chat for this user (or you can fetch all if you want)
-    const chat = await GeminiChat.findOne({ user: userId }).sort({ createdAt: -1 });
+    const chat = await GeminiChat.findOne({ user: userId }).sort({
+      createdAt: -1,
+    });
 
     if (!chat) {
       return res.status(404).json({ message: "No chat history found" });
