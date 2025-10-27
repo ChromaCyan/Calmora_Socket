@@ -87,7 +87,14 @@ function initializeSocket(server) {
           await createNotification(
             recipientId,
             "chat",
-            `New message from ${sender.firstName} ${sender.lastName}`
+            `New message from ${sender.firstName} ${sender.lastName}`,
+            {
+              chatId,
+              senderId: sender._id, 
+              senderFirstName: sender.firstName,
+              senderLastName: sender.lastName,
+              senderProfileImage: sender.profileImage, 
+            }
           );
 
           io.to(recipientId).emit("new_notification", {
