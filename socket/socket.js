@@ -11,16 +11,38 @@ function initializeSocket(server) {
     },
   });
 
+  // 🧠 Track users and their active chat rooms
+  const userActiveRooms = new Map(); // { userId: roomId }
+
   io.on("connection", (socket) => {
     console.log(`User connected: ${socket.id}`);
 
+    // Register user for personal notifications
     socket.on("registerUser", (userId) => {
       socket.join(userId);
+      socket.userId = userId; // store reference
       console.log(`User ${userId} registered for notifications`);
     });
 
+    // Join a chat room
+    socket.on("joinRoom", (roomId) => {
+      socket.join(roomId);
+      userActiveRooms.set(socket.userId, roomId);
+      console.log(`User ${socket.userId} joined room ${roomId}`);
+    });
+
+    // Leave a chat room
+    socket.on("leaveRoom", (roomId) => {
+      socket.leave(roomId);
+      if (userActiveRooms.get(socket.userId) === roomId) {
+        userActiveRooms.delete(socket.userId);
+      }
+      console.log(`User ${socket.userId} left room ${roomId}`);
+    });
+
+    // Handle sending messages
     socket.on("sendMessage", async (data) => {
-      console.log("Message received: ", data);
+      console.log("Message received:", data);
       const { senderId, recipientId, message, chatId } = data;
 
       try {
@@ -43,14 +65,11 @@ function initializeSocket(server) {
         chat.messages.push(newMessage);
         await chat.save();
 
-        // ✅ Fetch sender info
-        const sender = await User.findById(senderId); // make sure you have User model imported
-        if (!sender) {
-          console.error("Sender not found");
-          return;
-        }
+        // Fetch sender info
+        const sender = await User.findById(senderId);
+        if (!sender) return console.error("Sender not found");
 
-        // Emit to recipient room
+        // Emit to recipient room (live chat)
         io.to(recipientId).emit("receiveMessage", {
           chatId,
           senderId: newMessage.sender,
@@ -62,40 +81,43 @@ function initializeSocket(server) {
           senderProfileImage: sender.profileImage,
         });
 
-        // Notification logic
-        await createNotification(
-          recipientId,
-          "chat",
-          `New message from ${sender.firstName} ${sender.lastName}`
-        );
+        // 🧠 Only create notification if recipient NOT in same chat room
+        const recipientActiveRoom = userActiveRooms.get(recipientId);
+        if (recipientActiveRoom !== chatId) {
+          await createNotification(
+            recipientId,
+            "chat",
+            `New message from ${sender.firstName} ${sender.lastName}`
+          );
 
-        io.to(recipientId).emit("new_notification", {
-          type: "chat",
-          senderId,
-          senderFirstName: sender.firstName,
-          senderLastName: sender.lastName,
-          senderProfileImage: sender.profileImage,
-          chatId,
-          message: newMessage.content,
-          timestamp: newMessage.timestamp,
-        });
+          io.to(recipientId).emit("new_notification", {
+            type: "chat",
+            senderId,
+            senderFirstName: sender.firstName,
+            senderLastName: sender.lastName,
+            senderProfileImage: sender.profileImage,
+            chatId,
+            message: newMessage.content,
+            timestamp: newMessage.timestamp,
+          });
+          console.log(
+            `📩 Notification created for ${recipientId} (not in chat ${chatId})`
+          );
+        } else {
+          console.log(
+            `💬 Skipped notification — recipient ${recipientId} is already in chat ${chatId}`
+          );
+        }
       } catch (error) {
         console.error("Error saving message:", error);
       }
     });
 
-    socket.on("registerUser", (userId) => {
-      socket.join(userId);
-      console.log(`User ${userId} registered for notifications`);
-    });
-
-    socket.on("joinRoom", (roomId) => {
-      socket.join(roomId);
-      console.log(`User ${socket.id} joined room ${roomId}`);
-    });
-
     socket.on("disconnect", () => {
       console.log(`User disconnected: ${socket.id}`);
+      if (socket.userId) {
+        userActiveRooms.delete(socket.userId);
+      }
     });
   });
 
