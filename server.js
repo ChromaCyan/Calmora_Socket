@@ -42,6 +42,7 @@ app.post("/emit-notification", async (req, res) => {
       userId,
       type,
       message,
+      extra,
     });
     await notification.save();
 

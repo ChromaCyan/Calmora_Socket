@@ -5,6 +5,7 @@ const notificationSchema = new mongoose.Schema({
   type: { type: String, enum: ["chat", "appointment", "article"], required: true },
   message: { type: String, required: true },
   isRead: { type: Boolean, default: false },
+  extra: { type: mongoose.Schema.Types.Mixed, default: {} }, 
   createdAt: { type: Date, default: Date.now },
 });
 
