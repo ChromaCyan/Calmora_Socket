@@ -8,6 +8,7 @@ const initializeSocket = require("./socket/socket");
 const Notification = require("./model/notificationModel"); 
 const geminiRoutes = require("./routes/geminiRoute");
 const timeslotRoutes = require("./routes/timeslotRoute");
+const authRoutes = require("./routes/userRoute");
 
 const app = express();
 app.use(cors());
@@ -20,6 +21,7 @@ const io = initializeSocket(server);
 
 app.use("/api/chatbot", geminiRoutes);
 app.use("/api/timeslot", timeslotRoutes);
+app.use("/api/auth", authRoutes);
 
 // Connect MongoDB
 mongoose.connect(process.env.MONGO_URI, {
