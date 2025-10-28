@@ -90,10 +90,10 @@ function initializeSocket(server) {
             `New message from ${sender.firstName} ${sender.lastName}`,
             {
               chatId,
-              senderId: sender._id, 
+              senderId: sender._id,
               senderFirstName: sender.firstName,
               senderLastName: sender.lastName,
-              senderProfileImage: sender.profileImage, 
+              senderProfileImage: sender.profileImage,
             }
           );
 
@@ -117,6 +117,27 @@ function initializeSocket(server) {
         }
       } catch (error) {
         console.error("Error saving message:", error);
+      }
+    });
+
+    // Wait for recipient acknowledgment
+    socket.on("messageDelivered", async (data) => {
+      const { chatId, messageId } = data;
+      try {
+        const chat = await Chat.findById(chatId);
+        if (!chat) return;
+        const message = chat.messages.id(messageId);
+        if (message) {
+          message.status = "delivered";
+          await chat.save();
+          io.to(message.sender.toString()).emit("messageStatusUpdated", {
+            chatId,
+            messageId,
+            status: "delivered",
+          });
+        }
+      } catch (err) {
+        console.error("Error updating message status:", err);
       }
     });
 
