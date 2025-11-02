@@ -141,6 +141,29 @@ function initializeSocket(server) {
       }
     });
 
+    // Mark message as read
+    socket.on("messageRead", async (data) => {
+      const { chatId, messageId, readerId } = data;
+      try {
+        const chat = await Chat.findById(chatId);
+        if (!chat) return;
+        const message = chat.messages.id(messageId);
+        if (message && message.sender.toString() !== readerId) {
+          message.status = "read";
+          await chat.save();
+
+          // Notify sender
+          io.to(message.sender.toString()).emit("messageStatusUpdated", {
+            chatId,
+            messageId,
+            status: "read",
+          });
+        }
+      } catch (err) {
+        console.error("Error updating message to read:", err);
+      }
+    });
+
     socket.on("disconnect", () => {
       console.log(`User disconnected: ${socket.id}`);
       if (socket.userId) {
