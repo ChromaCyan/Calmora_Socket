@@ -203,13 +203,37 @@ function initializeSocket(server) {
     });
 
     // ✅ Simplified: handle explicit manual read (optional)
-    socket.on("messageRead", (data) => {
+    socket.on("messageRead", async (data) => {
       const { chatId, messageId, readerId, senderId } = data;
-      io.to(senderId).emit("messageStatusUpdated", {
-        chatId,
-        messageId,
-        status: "read",
-      });
+
+      try {
+        const chat = await Chat.findById(chatId);
+        if (!chat) return;
+
+        const message = chat.messages.id(messageId);
+        if (message && message.sender.toString() !== readerId) {
+          message.status = "read";
+          await chat.save();
+
+          // Notify the original sender immediately
+          io.to(senderId).emit("messageStatusUpdated", {
+            chatId,
+            messageId,
+            status: "read",
+          });
+
+          // Optionally, notify everyone in the room (for sync)
+          io.to(chatId).emit("messageStatusUpdated", {
+            chatId,
+            messageId,
+            status: "read",
+          });
+
+          console.log(`✅ Message ${messageId} marked as READ by ${readerId}`);
+        }
+      } catch (err) {
+        console.error("Error updating message to read:", err);
+      }
     });
 
     // Wait for recipient acknowledgment
