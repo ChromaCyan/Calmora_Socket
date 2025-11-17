@@ -1,6 +1,10 @@
 
 # Calmora Socket Server – Real-Time Backend Documentation
 
+![Calmora Logo](images/calmora_circle_crop.png)
+
+---
+
 A real-time backend server powering **Calmora**, handling chat messaging, live notifications, and socket-based events for patients and specialists.
 
 Built using **Node.js**, **Express**, **Socket.IO**, and **MongoDB**.
