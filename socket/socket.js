@@ -41,90 +41,12 @@ function initializeSocket(server) {
     });
 
     // Handle sending messages
-    // socket.on("sendMessage", async (data) => {
-    //   console.log("Message received:", data);
-    //   const { senderId, recipientId, message, chatId } = data;
-
-    //   try {
-    //     // Find or create chat
-    //     let chat = await Chat.findById(chatId);
-    //     if (!chat) {
-    //       chat = new Chat({
-    //         _id: chatId,
-    //         participants: [senderId, recipientId],
-    //         messages: [],
-    //       });
-    //     }
-
-    //     const newMessage = {
-    //       sender: senderId,
-    //       content: message,
-    //       timestamp: new Date(),
-    //     };
-
-    //     chat.messages.push(newMessage);
-    //     await chat.save();
-
-    //     // Fetch sender info
-    //     const sender = await User.findById(senderId);
-    //     if (!sender) return console.error("Sender not found");
-
-    //     // Emit to recipient room (live chat)
-    //     io.to(recipientId).emit("receiveMessage", {
-    //       chatId,
-    //       senderId: newMessage.sender,
-    //       content: newMessage.content,
-    //       timestamp: newMessage.timestamp,
-    //       status: "sent",
-    //       senderFirstName: sender.firstName,
-    //       senderLastName: sender.lastName,
-    //       senderProfileImage: sender.profileImage,
-    //     });
-
-    //     // 🧠 Only create notification if recipient NOT in same chat room
-    //     const recipientActiveRoom = userActiveRooms.get(recipientId);
-    //     if (recipientActiveRoom !== chatId) {
-    //       await createNotification(
-    //         recipientId,
-    //         "chat",
-    //         `New message from ${sender.firstName} ${sender.lastName}`,
-    //         {
-    //           chatId,
-    //           senderId: sender._id,
-    //           senderFirstName: sender.firstName,
-    //           senderLastName: sender.lastName,
-    //           senderProfileImage: sender.profileImage,
-    //         }
-    //       );
-
-    //       io.to(recipientId).emit("new_notification", {
-    //         type: "chat",
-    //         senderId,
-    //         senderFirstName: sender.firstName,
-    //         senderLastName: sender.lastName,
-    //         senderProfileImage: sender.profileImage,
-    //         chatId,
-    //         message: newMessage.content,
-    //         timestamp: newMessage.timestamp,
-    //       });
-    //       console.log(
-    //         `📩 Notification created for ${recipientId} (not in chat ${chatId})`
-    //       );
-    //     } else {
-    //       console.log(
-    //         `💬 Skipped notification — recipient ${recipientId} is already in chat ${chatId}`
-    //       );
-    //     }
-    //   } catch (error) {
-    //     console.error("Error saving message:", error);
-    //   }
-    // });
-
-    // Handle sending messages
     socket.on("sendMessage", async (data) => {
+      console.log("Message received:", data);
       const { senderId, recipientId, message, chatId } = data;
 
       try {
+        // Find or create chat
         let chat = await Chat.findById(chatId);
         if (!chat) {
           chat = new Chat({
@@ -138,33 +60,29 @@ function initializeSocket(server) {
           sender: senderId,
           content: message,
           timestamp: new Date(),
-          status: "sent",
         };
 
         chat.messages.push(newMessage);
         await chat.save();
 
+        // Fetch sender info
         const sender = await User.findById(senderId);
         if (!sender) return console.error("Sender not found");
 
-        const recipientActiveRoom = userActiveRooms.get(recipientId);
-
-        // If recipient is in the same room → mark as read immediately
-        const status = recipientActiveRoom === chatId ? "read" : "sent";
-
+        // Emit to recipient room (live chat)
         io.to(recipientId).emit("receiveMessage", {
-          _id: newMessage._id,
           chatId,
           senderId: newMessage.sender,
           content: newMessage.content,
           timestamp: newMessage.timestamp,
-          status,
+          status: "sent",
           senderFirstName: sender.firstName,
           senderLastName: sender.lastName,
           senderProfileImage: sender.profileImage,
         });
 
         // 🧠 Only create notification if recipient NOT in same chat room
+        const recipientActiveRoom = userActiveRooms.get(recipientId);
         if (recipientActiveRoom !== chatId) {
           await createNotification(
             recipientId,
@@ -189,50 +107,16 @@ function initializeSocket(server) {
             message: newMessage.content,
             timestamp: newMessage.timestamp,
           });
+          console.log(
+            `📩 Notification created for ${recipientId} (not in chat ${chatId})`
+          );
+        } else {
+          console.log(
+            `💬 Skipped notification — recipient ${recipientId} is already in chat ${chatId}`
+          );
         }
-
-        // Notify sender that message is delivered/read depending on recipient state
-        io.to(senderId).emit("messageStatusUpdated", {
-          chatId,
-          messageId: newMessage._id,
-          status,
-        });
       } catch (error) {
         console.error("Error saving message:", error);
-      }
-    });
-
-    // ✅ Simplified: handle explicit manual read (optional)
-    socket.on("messageRead", async (data) => {
-      const { chatId, messageId, readerId, senderId } = data;
-
-      try {
-        const chat = await Chat.findById(chatId);
-        if (!chat) return;
-
-        const message = chat.messages.id(messageId);
-        if (message && message.sender.toString() !== readerId) {
-          message.status = "read";
-          await chat.save();
-
-          // Notify the original sender immediately
-          io.to(senderId).emit("messageStatusUpdated", {
-            chatId,
-            messageId,
-            status: "read",
-          });
-
-          // Optionally, notify everyone in the room (for sync)
-          io.to(chatId).emit("messageStatusUpdated", {
-            chatId,
-            messageId,
-            status: "read",
-          });
-
-          console.log(`✅ Message ${messageId} marked as READ by ${readerId}`);
-        }
-      } catch (err) {
-        console.error("Error updating message to read:", err);
       }
     });
 
@@ -256,29 +140,6 @@ function initializeSocket(server) {
         console.error("Error updating message status:", err);
       }
     });
-
-    // Mark message as read
-    // socket.on("messageRead", async (data) => {
-    //   const { chatId, messageId, readerId } = data;
-    //   try {
-    //     const chat = await Chat.findById(chatId);
-    //     if (!chat) return;
-    //     const message = chat.messages.id(messageId);
-    //     if (message && message.sender.toString() !== readerId) {
-    //       message.status = "read";
-    //       await chat.save();
-
-    //       // Notify sender
-    //       io.to(message.sender.toString()).emit("messageStatusUpdated", {
-    //         chatId,
-    //         messageId,
-    //         status: "read",
-    //       });
-    //     }
-    //   } catch (err) {
-    //     console.error("Error updating message to read:", err);
-    //   }
-    // });
 
     socket.on("disconnect", () => {
       console.log(`User disconnected: ${socket.id}`);
